@@ -1,0 +1,3 @@
+kubeadm init --skip-phases=preflight --config=/kind/kubeadm.conf --skip-token-print --v=6
+kubectl taint nodes --all node-role.kubernetes.io/master-
+kubectl taint nodes --all node-role.kubernetes.io/control-plane- 
