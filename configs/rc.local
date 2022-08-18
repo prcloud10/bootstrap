@@ -1,0 +1,4 @@
+#!/bin/bash
+
+kubeadm init --skip-phases=preflight --config=/kind/kubeadm.conf --skip-token-print --v=6
+cilium install
