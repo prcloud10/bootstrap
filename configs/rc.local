@@ -1,4 +1,40 @@
 #!/bin/bash
 
+# Init kubernetes
 kubeadm init --skip-phases=preflight --config=/kind/kubeadm.conf --skip-token-print --v=6
-cilium install
+
+# Set kubeconfig 
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Wait for cluster readinnes
+kubectl wait pods -l component=kube-scheduler --for=condition=Ready --timeout=60s --all-namespaces         
+kubectl wait pods -l component=kube-controller-manager --for=condition=Ready --timeout=60s --all-namespaces
+kubectl wait pods -l component=kube-apiserver --for=condition=Ready --timeout=60s --all-namespaces                  
+kubectl wait pods -l component=etcd --for=condition=Ready --timeout=60s --all-namespaces 
+
+n=0
+until [ $n -ge 6 ]; do
+   REPLICA_COUNT=$(kubectl get daemonsets/kube-proxy -n kube-system -o template --template='{{ .status.numberReady }}')
+   echo ${REPLICA_COUNT}
+   if [ "${REPLICA_COUNT}" -gt 0 ] ; then
+         echo "[info] found 1 available replicas."
+         break
+   fi
+   echo -n "[info] waiting 10 seconds before trying again..."
+   sleep 10
+done 
+
+
+# Taint control node
+kubectl taint nodes --all node-role.kubernetes.io/master-
+kubectl taint nodes --all node-role.kubernetes.io/control-plane- 
+
+# Apply CNI
+kubectl apply -f /kind/cni.yaml
+kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=60s
+
+# Apply CSI
+kubectl apply -f /kind/csi.yaml
+kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=60s

@@ -76,7 +76,7 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         - name: POD_SUBNET
-          value: 10.244.0.0/16
+          value: 192.168.0.0/16
         - name: CONTROL_PLANE_ENDPOINT
           value: kind-control-plane:6443
         volumeMounts:
