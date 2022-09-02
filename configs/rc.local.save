@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Init kubernetes
+kubeadm init --skip-phases=preflight --config=/kind/kubeadm.conf --skip-token-print --v=6
+
+# Set kubeconfig 
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Wait for cluster readinnes
+kubectl wait pods -l component=kube-scheduler --for=condition=Ready --timeout=60s --all-namespaces         
+kubectl wait pods -l component=kube-controller-manager --for=condition=Ready --timeout=60s --all-namespaces
+kubectl wait pods -l component=kube-apiserver --for=condition=Ready --timeout=60s --all-namespaces                  
+kubectl wait pods -l component=etcd --for=condition=Ready --timeout=60s --all-namespaces 
+
+n=0
+until [ $n -ge 6 ]; do
+   REPLICA_COUNT=$(kubectl get daemonsets/kube-proxy -n kube-system -o template --template='{{ .status.numberReady }}')
+   echo ${REPLICA_COUNT}
+   if [ "${REPLICA_COUNT}" -gt 0 ] ; then
+         echo "[info] found 1 available replicas."
+         break
+   fi
+   echo -n "[info] waiting 10 seconds before trying again..."
+   sleep 10
+done 
+
+
+# Taint control node
+kubectl taint nodes --all node-role.kubernetes.io/master-
+kubectl taint nodes --all node-role.kubernetes.io/control-plane- 
+
+# Apply CNI
+kubectl apply -f /kind/cni.yaml
+kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=60s
+
+# Apply CSI
+kubectl apply -f /kind/csi.yaml
+kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=60s
+
+
+# Add helm repos
+helm repo add pnnl-miscscripts https://pnnl-miscscripts.github.io/charts/
+helm repo add pnnl-miscscripts-image-library-charts https://pnnl-miscscripts.github.io/image-library-charts/
+#helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+
+
+# Install apps
+helm install --atomic pixiecore pnnl-miscscripts/pixiecore 
+
+
+# Install monitoring tools
+kubectl create namespace monitoring
+helm upgrade --install --atomic loki --namespace=monitoring grafana/loki-simple-scalable
+#kubectl get secret --namespace monitoring loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+#helm install --atomic ipmi-exporter pnnl-miscscripts/ipmi-exporter
+#helm install --atomic smartctl-exporter pnnl-miscscripts/smartctl-exporter
+

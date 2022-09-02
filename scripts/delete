@@ -1,3 +1,4 @@
-docker rm -f kind-control-plane
-docker rmi bootstrap:latest
-sudo docker ps -a | grep Exit | cut -d ' ' -f 1 | xargs sudo docker rm
+docker rm -f bootstrap
+docker rmi -f bootstrap:latest
+docker rm $(docker ps -q -f status=exited)
+docker rmi $(docker images -f 'dangling=true' -q)

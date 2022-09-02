@@ -2,13 +2,25 @@ FROM kindest/node:v1.24.3
 
 # configs
 COPY ./configs/* /kind/
+COPY ./images/* /kind/
 
 # Update packages
-RUN apt update && apt install nano && apt install wget
-#RUN CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/master/stable.txt) && CLI_ARCH=amd64 && if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi && curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum} && sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum && tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+RUN apt update 
+RUN apt install nano -y
+RUN apt install wget -y
+RUN apt install git -y
 
+# Install helm
+RUN wget https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod +x get-helm-3 && ./get-helm-3 
 
 # Startup script
 COPY ./configs/rc.local /etc/rc.local
 RUN chmod +x /etc/rc.local
 COPY ./configs/rc-local.service /etc/systemd/system
+
+# Scripts for testing
+COPY ./test/nginx.yaml /kind/
+
+# Get repos
+RUN git clone https://github.com/grafana/helm-charts.git
+RUN cd helm-charts/charts/loki-stack && helm dependency build
