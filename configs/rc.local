@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Init kubernetes
-kubeadm init --skip-phases=preflight --config=/kind/kubeadm.conf --skip-token-print --v=6
+kubeadm init --skip-phases=preflight --config=/bootstrap/kubeadm.conf --skip-token-print --v=6
 
 
 # Set kubeconfig 
@@ -37,12 +37,12 @@ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 
 
 # Apply CNI
-kubectl apply -f /kind/cni.yaml
+kubectl apply -f /bootstrap/cni.yaml
 kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=60s
 
 
 # Apply CSI
-kubectl apply -f /kind/csi.yaml
+kubectl apply -f /bootstrap/csi.yaml
 kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=60s
 
 
@@ -51,13 +51,12 @@ kubectl create namespace monitoring
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
-helm upgrade --atomic --install loki    --namespace=monitoring grafana/loki-stack
-cd /helm-charts/charts
-helm upgrade --atomic --install grafana --namespace=monitoring grafana --set service.type=NodePort,service.nodePort=30400
-export NODE_PORT=$(kubectl get --namespace monitoring -o jsonpath="{.spec.ports[0].nodePort}" services grafana)
-export NODE_IP=$(kubectl get nodes --namespace monitoring -o jsonpath="{.items[0].status.addresses[0].address}")
-echo http://$NODE_IP:$NODE_PORT
-kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+helm upgrade --atomic --install loki --namespace=monitoring grafana/loki-stack --set promtail.enabled=true,grafana.enabled=true,controller.service.type=ClusterIP
+kubectl get secret --namespace monitoring loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+# Install ingress controller 
+helm upgrade --atomic --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx --namespace ingress-nginx --create-namespace --set controller.service.type=NodePort,controller.service.nodePorts.http=30400
+kubectl apply -f /bootstrap/ingress.yaml
 
 
 # Install apps
@@ -66,5 +65,3 @@ helm repo add pnnl-miscscripts https://pnnl-miscscripts.github.io/charts/
 helm repo add pnnl-miscscripts-image-library-charts https://pnnl-miscscripts.github.io/image-library-charts/
 helm repo update
 helm upgrade --atomic --install pixiecore --namespace=provision pnnl-miscscripts/pixiecore 
-#helm upgrade --atomic --install ipmi-exporter --namespace=monitoring pnnl-miscscripts/ipmi-exporter
-#helm upgrade --atomic --install smartctl-exporter --namespace=monitoring pnnl-miscscripts/smartctl-exporter

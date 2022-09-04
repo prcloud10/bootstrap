@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: main-ingress
+  namespace: monitoring
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: bootstrap
+    http:
+      paths:
+        - pathType: Prefix
+          path: "/"
+          backend:
+            service:
+              name: loki-grafana
+              port:
+                number: 80
+        - pathType: Prefix
+          path: "/login"
+          backend:
+            service:
+              name: loki-grafana
+              port:
+                number: 80
+        - pathType: Prefix
+          path: "/loki"
+          backend:
+            service:
+              name: loki 
+              port:
+                number: 3100

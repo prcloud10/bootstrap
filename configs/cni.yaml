@@ -2,7 +2,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: kindnet
+  name: bootstrapnet
 rules:
   - apiGroups:
     - policy
@@ -11,7 +11,7 @@ rules:
     verbs:
     - use
     resourceNames:
-    - kindnet
+    - bootstrapnet
   - apiGroups:
       - ""
     resources:
@@ -23,46 +23,46 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: kindnet
+  name: bootstrapnet
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: kindnet
+  name: bootstrapnet
 subjects:
 - kind: ServiceAccount
-  name: kindnet
+  name: bootstrapnet
   namespace: kube-system
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kindnet
+  name: bootstrapnet
   namespace: kube-system
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kindnet
+  name: bootstrapnet
   namespace: kube-system
   labels:
     tier: node
-    app: kindnet
-    k8s-app: kindnet
+    app: bootstrapnet
+    k8s-app: bootstrapnet
 spec:
   selector:
     matchLabels:
-      app: kindnet
+      app: bootstrapnet
   template:
     metadata:
       labels:
         tier: node
-        app: kindnet
-        k8s-app: kindnet
+        app: bootstrapnet
+        k8s-app: bootstrapnet
     spec:
       hostNetwork: true
       tolerations:
       - operator: Exists
-      serviceAccountName: kindnet
+      serviceAccountName: bootstrapnet
       containers:
       - name: kindnet-cni
         image: docker.io/kindest/kindnetd:v20220726-ed811e41
@@ -78,7 +78,7 @@ spec:
         - name: POD_SUBNET
           value: 192.168.0.0/16
         - name: CONTROL_PLANE_ENDPOINT
-          value: kind-control-plane:6443
+          value: bootstrap:6443
         volumeMounts:
         - name: cni-cfg
           mountPath: /etc/cni/net.d
